@@ -1,15 +1,9 @@
+import logging
 from pathlib import Path
-
-import typer
-from loguru import logger
 from tqdm import tqdm
 
 from graph_rag.config import MODELS_DIR, PROCESSED_DATA_DIR
 
-app = typer.Typer()
-
-
-@app.command()
 def main(
     # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
     features_path: Path = PROCESSED_DATA_DIR / "features.csv",
@@ -18,6 +12,7 @@ def main(
     # -----------------------------------------
 ):
     # ---- REPLACE THIS WITH YOUR OWN CODE ----
+    logger = logging.getLogger()
     logger.info("Training some model...")
     for i in tqdm(range(10), total=10):
         if i == 5:
@@ -27,4 +22,4 @@ def main(
 
 
 if __name__ == "__main__":
-    app()
+    main()
