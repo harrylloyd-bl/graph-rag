@@ -1,16 +1,25 @@
-name: graph-rag
+name: rag
 channels:
   - conda-forge
 dependencies:
-  - python=3.13
-  - black
-  - flake8
-  - isort
-  - pip
-  - typer
-  - loguru
-  - tqdm
-  - pip:
-    - python-dotenv
-    - mkdocs
-    - -e .
+  - sentence-transformers
+  - pytorch
+  - transformers
+  - torchvision
+  - torchaudio
+  - pandas
+  - ipython
+  - pytest
+  - matplotlib
+  - ipykernel
+  - ca-certificates
+  - certifi
+  - openssl
+  - python-dotenv
+  - streamlit
+  - orjson
+  - plotly
+  - jupyterlab
+  - anywidget
+  - umap-learn
+prefix: C:\Users\HLloyd\AppData\Local\mambaforge\envs\rag
