@@ -1,6 +1,5 @@
 certifi
 matplotlib==3.10.*
-openssl==3.4.*
 orjson==3.10.*
 pandas==2.2.*
 plotly==6.0.*
