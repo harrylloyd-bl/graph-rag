@@ -1,5 +1,6 @@
 certifi
 matplotlib
+neo4j
 orjson
 pandas
 plotly
