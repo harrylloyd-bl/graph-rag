@@ -1,0 +1,13 @@
+certifi
+matplotlib
+orjson
+pandas
+plotly
+python-dotenv
+pytorch
+sentence-transformers
+streamlit
+transformers
+torchvision
+torchaudio
+umap-learn
