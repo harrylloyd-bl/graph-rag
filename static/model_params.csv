@@ -1,0 +1,4 @@
+﻿Model,Embedding Dimensions,Max Input Length/Tokens,size/MB
+all-MiniLM-L6-v2,384,256,80
+all-mpnet-base-v2,768,384,420
+all-distilroberta-v1,768,512,290
