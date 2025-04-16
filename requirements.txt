@@ -1,0 +1,15 @@
+ca-certificates==2025.1.*
+certifi==2025.1.*
+matplotlib==3.10.*
+openssl==3.4.*
+orjson==3.10.*
+pandas==2.2.*
+plotly==6.0.*
+python-dotenv==1.0.*
+pytorch==2.5.*
+sentence-transformers==3.4.*
+streamlit==1.43.*
+transformers==4.49.*
+torchvision==0.20.*
+torchaudio==2.5.*
+umap-learn==0.5.*
