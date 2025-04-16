@@ -1,0 +1,19 @@
+name: rag
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - sentence-transformers
+  - pytorch
+  - transformers
+  - torchvision
+  - torchaudio
+  - pandas
+  - matplotlib
+  - certifi
+  - python-dotenv
+  - streamlit
+  - orjson
+  - plotly
+  - umap-learn
+prefix: C:\Users\HLloyd\AppData\Local\mambaforge\envs\rag
