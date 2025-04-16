@@ -1,5 +1,5 @@
-ca-certificates==2025.1.*
-certifi==2025.1.*
+ca-certificates
+certifi
 matplotlib==3.10.*
 openssl==3.4.*
 orjson==3.10.*
