@@ -4,7 +4,7 @@ orjson
 pandas
 plotly
 python-dotenv
-pytorch
+torch
 sentence-transformers
 streamlit
 transformers
