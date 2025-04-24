@@ -121,3 +121,55 @@ def embedding_text():
         paper citations, Stack Exchange and WikiAnswers.
     """
     return intro, analogy_1, analogy_2, models
+
+
+def rag_text():
+    text = """
+        Retrieval Augmented Generation (RAG) is the process of having an LLM use the results of a search (semantic or keyword)
+        to generate an output. This process of grounding the output of an LLM strictly in the results of a search on a
+        document store improves the reliability of the output and decreases hallucinations. It is also the part of this
+        demo that is implemented in Primo VE as the Primo Research Assistant. In that case the results of a search on
+        the contents of the catalogue are passed to the LLM to generate a summary of the results. See the Digital Scholarship
+        [Topic Guide on AI/ML](https://libereurope.github.io/ds-topic-guides/ai-ml.html) for more information.
+        
+        As with the embedding process and semantic search the results are dependent on the language model and its parameters,
+        on the results returned, and may be non-deterministic, that is the same input may not always give the same results.
+        For this demo I have used the Hugging Face inference API, accessing the Mistral 7B model which a relatively small general LLM.
+    """
+    return text
+
+def ethics_text():
+    text = """
+        There are two main ethical concerns I want to highlight here. The first is environmental, and around the storage
+        and energy use required to do this kind of work, particularly with large collections. The graph database for 
+        50,000 BNB records was around 300Mb in size. Adding embedded values and creating indexes for those embedded values
+        increased the size of the database to 4Gb. If we were talking about embedding and indexing large parts of our
+        collection the index alone (not including the embeddings themselves could run to 100s of Gb if not well into the Tb
+        range. This storage comes at a cost both financial and environmental. Furthermore there's energy use involved in
+        the embedding, and any generation that comes as a result. This demo doesn't track that, but I'd like it to.
+        
+        The other concern is the reason why the visualisations are here. Embedding models are trained on the text available
+        to them. If you remember from further up in the demo, this mainly consists of Reddit comments. The point that the
+        visualisations are trying to make is that embedding puts terms into a very high dimensional space, and what we
+        don't necessarily understand is how well our searches are exploring that space. I think this is likely to be
+        a particular issue with terms and types on content not commonly found in the training data.
+    """
+    return text
+
+
+def remote_warning():
+    text = """
+        Due to storage constraints, the web version of this demo can't embed your searches at this time
+        We can discuss what the visualisation means, and how we might use it as a tool to understand issues with embedding.
+    """
+    return text
+
+
+def visualise_select():
+    text = """
+        The visualisation process will take 1-2 minutes as the dimensionality reduction process is slow
+        You can choose to visualise the search term from above, or investigate some of the top search terms used in our
+        interim catalogue up to 25/02/25.
+    """
+
+    return text
