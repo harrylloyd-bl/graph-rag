@@ -1,19 +1,22 @@
-import os
-import pickle
-import platform
-
-import dotenv
-from huggingface_hub import InferenceClient
-from neo4j import GraphDatabase
-import pandas as pd
 import streamlit as st
-from tqdm import tqdm
+st.title("High Friction Graph Database Semantic Search")
 
-from graph_rag import app_text as text
-from graph_rag import app
-from graph_rag.config import model_params
+with st.spinner("Loading"):
+    import os
+    import pickle
+    import platform
 
-tqdm.pandas()
+    import dotenv
+    from huggingface_hub import InferenceClient
+    from neo4j import GraphDatabase
+    import pandas as pd
+    from tqdm import tqdm
+
+    from graph_rag import app_text as text
+    from graph_rag import app
+    from graph_rag.config import model_params
+
+    tqdm.pandas()
 
 VISUALISE = True
 
@@ -37,17 +40,19 @@ else:
     user = os.getenv("NEO4J_USERNAME")
     pwd = os.getenv("NEO4J_PASSWORD")
 
-st.title("High Friction Graph Database Semantic Search")
+with st.spinner("Connecting to Graph DB"):
+    driver = GraphDatabase.driver(uri=uri, auth=(user, pwd), database="neo4j")
 
-driver = GraphDatabase.driver(uri=uri, auth=(user, pwd), database="neo4j")
-
-try:
-    driver.verify_connectivity()
-    NEO4J_CONNECTION = True
-    st.success("Connected to Neo4j DB")
-except:
-    NEO4J_CONNECTION = False
-    st.warning("Failed to connect to Neo4j DB. Using pre-populated query results instead. Please check Neo4j connection paramaters and try again")
+    try:
+        driver.verify_connectivity()
+        NEO4J_CONNECTION = True
+        st.success("Connected to Neo4j DB")
+    except:
+        NEO4J_CONNECTION = False
+        if LOCAL:
+            st.warning("Failed to connect to Neo4j DB. Using pre-populated query results instead. Please check Neo4j connection paramaters and try again")
+        else:
+            st.warning("Database access isn't currently available remotely. There are several pre-populated search queries to choose from instead!")
 
 st.markdown(text.title_text())
 
@@ -71,47 +76,74 @@ st.dataframe(pd.read_csv("static\\model_params.csv", index_col=0, encoding="utf-
 
 st.markdown("## Search")
 
-holding_query = "What do you want to search for today?"
-q = st.text_input(
-    "Search box",
-    value=holding_query,
-    help="The query will be embedded and compared to the embedded subset of the BNB",
-    label_visibility="hidden"
-)
+if NEO4J_CONNECTION:
+    holding_query = "What do you want to search for today?"
+    q = st.text_input(
+        "Search box",
+        value=holding_query,
+        help="The query will be embedded and compared to the embedded subset of the BNB",
+        label_visibility="hidden"
+    )
 
-if q != holding_query:
+    if q != holding_query:
 
-    with driver.session() as session:
-        limit = 5
-        kw_result = session.execute_read(app.kw_search, query=q, limit=limit)
-        kw_res = ["" for x in range(5)]
-        for i, x in enumerate(kw_result):
-            kw_res[i] = x[0]
+        with driver.session() as session:
+            limit = 5
+            kw_result = session.execute_read(app.kw_search, query=q, limit=limit)
+            kw_res = ["" for x in range(5)]
+            for i, x in enumerate(kw_result):
+                kw_res[i] = x[0]
 
-        results_df = pd.DataFrame(
-            data={"Keyword Search": kw_res},
-            index=pd.RangeIndex(limit)
-        )
+            results_df = pd.DataFrame(
+                data={"Keyword Search": kw_res},
+                index=pd.RangeIndex(limit)
+            )
 
-        for m in model_params.keys():
-            embedder = model_params[m]["model"]
-            idx = "titleLCSH" + model_params[m]["acronym"].capitalize()
-            semantic_result = session.execute_read(app.semantic_search, query=q, model=embedder, idx=idx, nn=limit)
-            semantic_res = [(x[0][0], x[1]) for x in semantic_result]
-            results_df[m] = [x[0] for x in semantic_res]
-            results_df[m + "_uri"] = [x[1] for x in semantic_res]
-        st.success("Search complete")
+            for m in model_params.keys():
+                embedder = model_params[m]["model"]
+                idx = "titleLCSH" + model_params[m]["acronym"].capitalize()
+                semantic_result = session.execute_read(app.semantic_search, query=q, model=embedder, idx=idx, nn=limit)
+                semantic_res = [(x[0][0], x[1]) for x in semantic_result]
+                results_df[m] = [x[0] for x in semantic_res]
+                results_df[m + "_uri"] = [x[1] for x in semantic_res]
+            st.success("Search complete")
 
-try:
-    st.table(results_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
-except:
-    st.write("Oops that search term failed, please try another.")
+    try:
+        st.table(results_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
+        # dl = st.button("Download results df")
+        # filename = st.text_input("Write file name")
+        # if dl:
+        #     results_df.to_csv(f"static\\{filename}.csv", encoding="utf-8-sig")
+    except NameError:  # app init and results_df hasn't been created yet
+        pass
+    except:
+        st.write("Oops that search term failed, please try another.")
+elif not NEO4J_CONNECTION:
+    st.write("The database connection is unavailable, but you can use these four example searches to compare results and for visualisations later")
+    tab_shk_kw, tab_shk, tab_eic, tab_inf = st.tabs(["Shakespeare KW", "Shakespeare", "East India Company", "Influencers"])
+    with tab_shk_kw:
+        st.write("Query: Shakespeare")
+        st.write("This tab shows search with a single key word. The query returns results on a key word search using the term, unlike for the more nuanced searches in other tabs")
+        results_df = pd.read_csv("static\\shakespeare_kw.csv", encoding="utf-8-sig", index_col=0)
+        st.table(results_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
+    with tab_shk:
+        st.write("Query: What kind of works did William Shakespeare write?")
+        results_df = pd.read_csv("static\\shakespeare.csv", encoding="utf-8-sig", index_col=0)
+        st.table(results_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
+    with tab_eic:
+        st.write("Query: How did the East India Company rise to power?")
+        results_df = pd.read_csv("static\\east_india_company.csv", encoding="utf-8-sig", index_col=0)
+        st.table(results_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
+    with tab_inf:
+        st.write("Query: Different versions of the quran")
+        results_df = pd.read_csv("static\\quran.csv", encoding="utf-8-sig", index_col=0)
+        st.table(results_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
 
 st.markdown("## Retrieval Augmented Generation")
 
 st.markdown(text.rag_text())
 
-model = st.radio(
+vis_model = st.radio(
     label="Choose the embedding model output you'd like to summarise with Mistral-7B.",
     options=["all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]
 )
@@ -122,7 +154,7 @@ if run_rag and q == holding_query:
     st.write("Please run a search on the database, then retry.")
 
 elif run_rag and q != holding_query:
-    titles = "; ".join(results_df[model].values)
+    titles = "; ".join(results_df[vis_model].values)
     client = InferenceClient(provider="hf-inference", api_key=os.environ["HF_API_KEY"])
     n_requests = 1
     with st.spinner(text="Get retrieval augmented generation content from HF API"):
@@ -141,45 +173,46 @@ st.markdown("## Visualising Results")
 
 if not VISUALISE:
     st.write("Visualisations toggled off")
-
-if VISUALISE and not LOCAL:
-    st.write(text.remote_warning())
-    umap_df = pickle.load(open(f"static/{model_params[model]['acronym']}_umap.p", "rb"))
-    umap_fig = app.create_umap_fig(umap_df)
-    with st.spinner("Creating Plotly chart"):
-        st.plotly_chart(umap_fig)
+    st.stop()
 
 # Requires storage for the embedded files so that they can be umap-ed
-if VISUALISE and LOCAL:
+if LOCAL:
     st.write(text.visualise_select())
     vis_select = st.radio(
         label="Do you want to use your search, or searches of the interim catalogue generated by BL users?",
         options=["BL user searches", "My search"]
     )
 
+    vis_model = st.radio(
+        label="Choose the embedding model search results you'd like to visualise.",
+        options=["all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]
+    )
+
     # subject headings for plotting
     with st.spinner("Running UMAP"):
-        umap_df, reducer = app.create_umap(model)
+        umap_df, reducer = app.create_umap(vis_model)
     umap_fig = app.create_umap_fig(umap_df)
 
     if vis_select == "My search" and q != holding_query:
-        with st.spinner("Adding your search to figure"):
-            hovertext_df = umap_df.loc[pd.Index(results_df[model + "_uri"].values), "Title"]
 
-            x, y, z = umap_df.loc[results_df[model + "_uri"].values, ["Feature 1", "Feature 2", "Feature 3"]].values.T
+        with st.spinner("Adding your search to figure"):
+            uris = pd.Index(results_df[vis_model + "_uri"].values)
+            hovertext_df = umap_df.loc[uris, "Title"]
+
+            x, y, z = umap_df.loc[uris, ["Feature 1", "Feature 2", "Feature 3"]].values.T
             umap_fig.add_scatter3d(x=x, y=y, z=z, hoverinfo="text", hovertext=hovertext_df, showlegend=False,
                                    mode="markers", marker={"size": 8, "symbol": "cross", "color": "black"})
 
-            embedded_search = model_params[model]["model"].encode(q)
+            embedded_search = model_params[vis_model]["model"].encode(q)
 
             x, y, z = reducer.transform(embedded_search)
             umap_fig.add_scatter3d(x=x, y=y, z=z, hoverinfo="text", hovertext=f"Search term: {q}", showlegend=False,
-                                   mode="markers", marker={"size": 12, "symbol": "cross", "color": "gold"})
+                                   mode="markers", marker={"size": 12, "symbol": "triangle", "color": "gold"})
 
     if vis_select == "BL user searches":
         # user queries
         with st.spinner("Adding BL user searches to figure"):
-            informational_umap = app.umap_transform_user_search(model, reducer)
+            informational_umap = app.umap_transform_user_search(vis_model, reducer, use_live_data=False)
 
             hovertext_df = informational_umap.iloc[:5].loc[:, :"Results"].apply(
                 lambda x: f"Search: {x['Search String']}<br>Total searches: {x['Searches']}<br>KW Hits {x['Results']}",
@@ -189,4 +222,36 @@ if VISUALISE and LOCAL:
             umap_fig.add_scatter3d(x=x, y=y, z=z, hoverinfo="text", hovertext=hovertext_df, showlegend=False,
                                    mode="markers", marker={"size": 10, "symbol": "cross", "color": "black"})
 
-    st.plotly_chart(umap_fig)
+    with st.spinner("Creating UMAP scatter chart"):
+        st.plotly_chart(umap_fig)
+
+if not LOCAL:
+    st.write(text.visualise_select())
+    vis_select = st.radio(
+        label="Do you want to use one of the ready made searches above, or searches of the interim catalogue generated by BL users?",
+        options=["BL user searches", "My search"]
+    )
+
+    if vis_select == "My search" and q != holding_query:
+        vis_model = st.radio(
+            label="Choose the embedding model search results you'd like to visualise.",
+            options=["all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]
+        )
+
+        vis_query = st.radio(
+            label="Choose the search",
+            options=["Shakespeare key word", "Shakespeare", "East India Company", "Quran"]
+        )
+
+        st.write(text.remote_warning())
+        umap_df = pickle.load(open(f"static/{model_params[vis_model]['acronym']}_umap.p", "rb"))
+        umap_fig = app.create_umap_fig(umap_df)
+
+        hovertext_df = umap_df.loc[results_df[vis_model + "_uri"].values, "Title"]
+        x, y, z = umap_df.loc[results_df[vis_model + "_uri"].values, ["Feature 1", "Feature 2", "Feature 3"]].values.T
+        umap_fig.add_scatter3d(x=x, y=y, z=z, hoverinfo="text", hovertext=hovertext_df, showlegend=False,
+                               mode="markers", marker={"size": 8, "symbol": "cross", "color": "black"})
+
+        with st.spinner("Creating UMAP scatter chart"):
+            st.plotly_chart(umap_fig)
+
