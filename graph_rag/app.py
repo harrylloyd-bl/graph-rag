@@ -99,38 +99,66 @@ def load_umap_data(model: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame
     :param model: str
     :return: tuple(pd.DataFrame, pd.DataFrame, pd.DataFrame)
     """
-    topic_path = os.path.join(PROCESSED_DATA_DIR, "most_common_topic.csv")
+    most_common_lcsh_path = os.path.join(STATIC_DIR, "most_common_topic.csv")
     titles_path = os.path.join(STATIC_DIR, "titles.csv")
     acronym = model_params[model]["acronym"]
-    embedded_path = os.path.join(PROCESSED_DATA_DIR, f"titles_lcsh_embedded_{acronym}.p")
+    embedded_path = os.path.join(STATIC_DIR, f"titles_lcsh_embedded_{acronym}.p")
 
-    most_common_topic_df = pd.read_csv(topic_path, index_col=0, encoding="utf-8-sig")
+    most_common_lcsh_df = pd.read_csv(most_common_lcsh_path, index_col=0, encoding="utf-8-sig")
     titles_df = pd.read_csv(titles_path, encoding="utf8", index_col=0)
 
     embedded_df = pickle.load(open(embedded_path, "rb"))
     embedded_df[f"embedding_{acronym}"] = embedded_df[f"embedding_{acronym}"].apply(lambda x: np.array(x))
 
-    return most_common_topic_df, titles_df, embedded_df
+    return most_common_lcsh_df, titles_df, embedded_df
+
+
+def apply_create_map(grp, dup_map: dict):
+    map_to = grp.index[0]
+    for uri in grp.index[1:]:
+        dup_map[uri] = map_to
+    return None
+
+
+def create_duplicate_map(df: pd.DataFrame) -> dict[str, str]:
+    """
+    UMAP is an expensive operation. We de-dup the dataframe of works on "Title" before UMAP-ing to minimise compute time
+    Searches on the database potentially return "Title" duplicates that were dropped.
+    So create a map from dropped duplicate URIs to equivalent URIs represented in the UMAP-ed so we can plot
+    duplicates later.
+    :param df:
+    :return:
+    """
+    duplicates_df = df[df.duplicated(subset="title", keep=False)]
+    duplicates_map = {}
+    duplicates_df.groupby(by="title", as_index=False).apply(apply_create_map, dup_map=duplicates_map,
+                                                            include_groups=False)
+    uris_retained_in_umap = df.drop_duplicates(subset="title", keep="first").index
+    for uri in uris_retained_in_umap:
+        duplicates_map[uri] = uri
+
+    return duplicates_map
 
 
 @streamlit.cache_data(show_spinner=False)
-def create_umap(model: str) -> tuple[pd.DataFrame, umap.UMAP]:
+def create_umap(model: str) -> tuple[pd.DataFrame, umap.UMAP, dict[str: str]]:
     """
     Carry out the UMAP algorithm on a dataset of embedded BNB titles
     Return a plot ready dataframe and a fitted UMAP model
     :param model: str
     :return: tuple[pd.DataFrame, umap.UMAP]
     """
-    most_common_topic_df, titles_df, embedded_df = load_umap_data(model)
+    most_common_lcsh_df, titles_df, embedded_df = load_umap_data(model)
     acronym = model_params[model]["acronym"]
 
     combined_df = titles_df.join(embedded_df).dropna()
-    dd_df = combined_df.drop_duplicates(subset="title").copy()
-    topic_df = dd_df.join(most_common_topic_df["lcsh_t1"], on="uri").dropna()
-    model_arr = np.vstack(topic_df[f"embedding_{acronym}"])
+    duplicates_map = create_duplicate_map(combined_df)
+    drop_dup_df = combined_df.drop_duplicates(subset="title", keep="first").copy()
+    topic_df = drop_dup_df.join(most_common_lcsh_df["lcsh_t1"], on="uri").dropna()
+    umap_arr = np.vstack(topic_df[f"embedding_{acronym}"])
 
     reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=3)
-    reduced_data = reducer.fit_transform(model_arr)
+    reduced_data = reducer.fit_transform(umap_arr)
 
     umap_df = topic_df.join(
         pd.DataFrame(data=reduced_data, columns=["f1", "f2", "f3"], index=topic_df.index)
@@ -149,7 +177,7 @@ def create_umap(model: str) -> tuple[pd.DataFrame, umap.UMAP]:
 
     umap_df["LCSH Class"] = umap_df["LCSH Class Text"].map(class_map)
 
-    return umap_df, reducer
+    return umap_df, reducer, duplicates_map
 
 
 def umap_transform_user_search(model: str, reducer: umap.UMAP, use_live_data: bool = False):
