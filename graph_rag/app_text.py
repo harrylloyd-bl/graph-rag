@@ -138,14 +138,16 @@ def rag_text():
     """
     return text
 
+
 def ethics_text():
     text = """
         There are two main ethical concerns I want to highlight here. The first is environmental, and around the storage
         and energy use required to do this kind of work, particularly with large collections. The graph database for 
         50,000 BNB records was around 300Mb in size. Adding embedded values and creating indexes for those embedded values
-        increased the size of the database to 4Gb. If we were talking about embedding and indexing large parts of our
-        collection the index alone (not including the embeddings themselves could run to 100s of Gb if not well into the Tb
-        range. This storage comes at a cost both financial and environmental. Furthermore there's energy use involved in
+        increased the size of the database to 4Gb. There are probably efficiencies to be made in this process, but 
+        if we were talking about embedding and indexing large parts of our collection requiring multiples of our existing
+        storage capacity that's not insignificant. 
+        This storage comes at a cost both financial and environmental. Furthermore there's energy use involved in
         the embedding, and any generation that comes as a result. This demo doesn't track that, but I'd like it to.
         
         The other concern is the reason why the visualisations are here. Embedding models are trained on the text available
@@ -159,15 +161,62 @@ def ethics_text():
 
 def remote_warning():
     text = """
-        Due to storage constraints, the web version of this demo can't embed your searches at this time
-        We can discuss what the visualisation means, and how we might use it as a tool to understand issues with embedding.
+        Embedding pre-made query while access to graph database isn't available.
     """
     return text
 
 
+def visualise_text():
+    why_text = """
+        The final part of this demo is a visualisation of the results of the semantic vector search on the BNB. Given the
+        very high dimensional spaces the embeddings exist in it's impossible to visualise them as-is using traditional
+        methods. What I have done here, in an approach echoing work by Kaspar Beelen on [ChatGPT and censorship](
+        https://www.london.ac.uk/news-events/blogs/censorship-queer-literature-large-language-models-experiment-probing-chatgpt)
+        and in Jonathan Reades and Jennie Williams' Programming Historian article on [embeddings](
+        https://programminghistorian.org/en/lessons/clustering-visualizing-word-embeddings), is carry out dimensionality
+        reduction, which tries to reduce the number of dimensions in data while preserving as much information as possible.
+        
+        This demo uses Uniform Manifold Approximation and Projection (UMAP) to reduce the number of dimensions.
+        We project the hundreds of dimensions in the embedded data to three dimensions which are visualised in the interactive plot.
+        The reason for this is to try and understand where in embedding space queries have ended up. By comparing the
+        embedded query to it's local surroundings in three dimensions we can understand whether it's ended up where we
+        expect it to be in the space of our collection items.
+    """
+    how_to_read_text = """
+        At the bottom of this page is a 3D scatter plot. Each point is an item from the BNB. The items are coloured by
+        their 'top-level' Library of Congress Subject Heading (LCSH) - i.e. if the subject heading was
+        "Hungary--Politics and government--1945-1989" the label would be "Hungary". Only 50 colours are used and there
+        are almost 8000 topics for this part of the BNB, so some colours are repeated, each point has mouseover text with
+        the details of the data point to help interpret.
+        
+        UMAP works reasonably well at preserving the local structure of high dimensional space, sacrificing being able
+        to associate meaning to distances between points in projected data. What this means for the plot is that you see
+        regions of points with the same colour that have the same subject heading that have been faithfully kept close
+        to each other in the projection, but the distance between these local regions of points doesn't necessarily have
+        any meaning. That the English heading region is roughly as far from the Mathematics heading as it is Industry
+        doesn't necessarily teach us anything about their distance from each other in the original high dimensional space.
+        See the [UMAP Zoo](https://duhaime.s3.amazonaws.com/apps/umap-zoo/index.html) project for some nice examples using
+        3D meshes of animals.
+        
+        How to interpret the plot, then, is to look at the embedded search results, and see what is near them. Is it what
+        you would expect? Is the local neighbourhood to that point consistent with the kinds of topics you'd expect to see
+        near your search. When looking at the five popular search terms entered by users into the BL interim catalogue 
+        does the area around each search contain things you would want to serve to our users. What is near to the search
+        in the 3D projection is a reasonable approximation of the actual search results that will go to users of this 
+        particular semantic search. When comparing a search term you've entered into the query box above to the location
+        of the results, you will see that the projection isn't perfect, the hits from the semantic search aren't always 
+        closest to the search query, but they are in the right neighbourhood.
+        
+        Particularly interrogate if there are things missing from the local area that you would expect to see served to users.
+        Bear in mind that this is only a sample of 50k records, we would expect the representation of our complete collections
+        to be much richer (and harder to interpret!).
+    """
+    return why_text, how_to_read_text
+
+
 def visualise_select():
     text = """
-        The visualisation process will take 1-2 minutes as the dimensionality reduction process is slow
+        The visualisation process will take 1-2 minutes as the dimensionality reduction process is slow.
         You can choose to visualise the search term from above, or investigate some of the top search terms used in our
         interim catalogue up to 25/02/25.
     """
