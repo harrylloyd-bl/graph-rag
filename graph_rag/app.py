@@ -1,17 +1,20 @@
 import os
 import pickle
 
-import plotly.graph_objects
-import streamlit
+from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 from matplotlib import colormaps
 import numpy as np
 import pandas as pd
+import plotly.graph_objects
 import plotly.express as px
 import requests
+import streamlit as st
 import umap
 
 from graph_rag.config import *
+
+load_dotenv()
 
 
 def kw_search(tx, query=None, limit=5):
@@ -44,37 +47,52 @@ def semantic_search(tx, model: SentenceTransformer, query: str, idx: str, nn: in
     return tx.run(cypher, idx=idx, nn=nn, embedded_query=embedded_query).values()
 
 
-def rag(client: InferenceClient, titles: str, n_requests=1):
+def rag(query: str, titles: pd.Series, out_container: st.empty, n_requests=1):
     """
     Pass a query to a HF Inference Client to generate a summary of book titles
-    :param client: huggingface_hub.InferenceClient
-    :param titles: str
+    :param titles: pd.Series
+    :param out_container: st.empty
     :param n_requests: int
     :return:
     """
+    if query == HOLDING_QUERY:
+        st.write("Please run a search on the database, then retry.")
+        return None
+
+    client = InferenceClient(provider="hf-inference", api_key=os.environ["HF_TOKEN"])
+
+    titles = "; ".join(titles)
+
     responses = []
-    for i in range(n_requests):
-        try:
-            rag_content = client.chat.completions.create(
-                model="mistralai/Mistral-7B-Instruct-v0.3",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"""
-                        Collectively summarise these book titles (separated by ';') in 40 words or less:
-                        {titles}
-                        """
-                    }
-                ],
-                max_tokens=60,
-            )
-            responses.append(rag_content)
+    with st.spinner("Get retrieval augmented generation content from HF API"):
+        for i in range(n_requests):
+            try:
+                rag_content = client.chat.completions.create(
+                    model="mistralai/Mistral-7B-Instruct-v0.3",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"""
+                            Collectively summarise these book titles (separated by ';') in 40 words or less:
+                            {titles}
+                            """
+                        }
+                    ],
+                    max_tokens=60,
+                )
+                responses.append(rag_content)
 
-        except requests.exceptions.ConnectionError as e:
-            print(f"Connection Error: {e}")
-            print("Please ensure you are connected to the internet!")
+            except requests.exceptions.ConnectionError as e:
+                print(f"Connection Error: {e}")
+                print("Please ensure you are connected to the internet!")
 
-    return responses
+    if responses:
+        tabs = out_container.tabs([f"Response {x}" for x in range(1, n_requests + 1)])
+        for r, tab in zip(responses, tabs):
+            tab.write(f"LLM generated response to semantic search results:")
+            tab.markdown(f">{r.choices[0].message['content']}")
+
+    return None
 
 
 def create_umap_fig(df: pd.DataFrame) -> plotly.graph_objects.Figure:
@@ -140,7 +158,7 @@ def create_duplicate_map(df: pd.DataFrame) -> dict[str, str]:
     return duplicates_map
 
 
-@streamlit.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False)
 def create_umap(model: str) -> tuple[pd.DataFrame, umap.UMAP, dict[str: str]]:
     """
     Carry out the UMAP algorithm on a dataset of embedded BNB titles
