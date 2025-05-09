@@ -175,7 +175,7 @@ def create_umap(model: str) -> tuple[pd.DataFrame, umap.UMAP, dict[str: str]]:
     topic_df = drop_dup_df.join(most_common_lcsh_df["lcsh_t1"], on="uri").dropna()
     umap_arr = np.vstack(topic_df[f"embedding_{acronym}"])
 
-    reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=3)
+    reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, n_components=3, random_state=1973)
     reduced_data = reducer.fit_transform(umap_arr)
 
     umap_df = topic_df.join(
