@@ -36,3 +36,5 @@ model_params = {
     "all-distilroberta-v1": {"acronym": "adr1", "dims": 768, "max_seq_length": 512, "score": ["dot", "cos", "euc"],
                              "model": model_adr1}
 }
+
+HOLDING_QUERY = "What do you want to search for today?"
