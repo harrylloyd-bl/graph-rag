@@ -246,7 +246,8 @@ if not LOCAL:
         umap_df = pickle.load(open(f"static/{model_params[vis_model]['acronym']}_umap.p", "rb"))
         umap_fig = app.create_umap_fig(umap_df)
 
-        hovertext_df = umap_df.loc[results_df[vis_model + "_uri"].values, "Title"]
+        uris = pd.Index(results_df[vis_model + "_uri"].map(dup_map).values)
+        hovertext_df = umap_df.loc[uris, "Title"]
         x, y, z = umap_df.loc[results_df[vis_model + "_uri"].values, ["Feature 1", "Feature 2", "Feature 3"]].values.T
         umap_fig.add_scatter3d(x=x, y=y, z=z, hoverinfo="text", hovertext=hovertext_df, showlegend=False,
                                mode="markers", marker={"size": 8, "symbol": "cross", "color": "black"})
