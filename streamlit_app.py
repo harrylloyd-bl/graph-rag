@@ -71,7 +71,7 @@ with st.expander("Analogy Two: XKCD - Features of Adulthood"):
 
 st.markdown(emb_models)
 
-st.dataframe(pd.read_csv("static\\model_params.csv", index_col=0, encoding="utf-8-sig"))
+st.dataframe(pd.read_csv("static/model_params.csv", index_col=0, encoding="utf-8-sig"))
 
 st.markdown("## Search")
 
@@ -107,11 +107,7 @@ if NEO4J_CONNECTION:
             st.success("Search complete")
 
     try:
-        st.table(results_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
-        # dl = st.button("Download results df")
-        # filename = st.text_input("Write file name")
-        # if dl:
-        #     results_df.to_csv(f"static\\{filename}.csv", encoding="utf-8-sig")
+        st.dataframe(results_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
     except NameError:  # app init and results_df hasn't been created yet
         pass
     except:
@@ -127,25 +123,25 @@ elif not NEO4J_CONNECTION:
         st.write("Query: Shakespeare")
         st.write("This query searches 'Shakespeare' as a single key word, compared to the natural language phrase in the next tab")
         shk_kw_q = "Shakespeare"
-        shk_kw_df = pd.read_csv("static\\shakespeare_kw.csv", encoding="utf-8-sig", index_col=0)
+        shk_kw_df = pd.read_csv("static/shakespeare_kw.csv", encoding="utf-8-sig", index_col=0)
         st.dataframe(shk_kw_df[tab_display_cols], hide_index=True)
 
     with tab_shk:
         st.write("Query: What kind of works did William Shakespeare write?")
         shk_q = "What kind of works did William Shakespeare write?"
-        shk_df = pd.read_csv("static\\shakespeare.csv", encoding="utf-8-sig", index_col=0)
+        shk_df = pd.read_csv("static/shakespeare.csv", encoding="utf-8-sig", index_col=0)
         st.dataframe(shk_df[tab_display_cols], hide_index=True)
 
     with tab_eic:
         st.write("Query: How did the East India Company rise to power?")
         eic_q = "How did the East India Company rise to power?"
-        eic_df = pd.read_csv("static\\east_india_company.csv", encoding="utf-8-sig", index_col=0)
+        eic_df = pd.read_csv("static/east_india_company.csv", encoding="utf-8-sig", index_col=0)
         st.dataframe(eic_df[tab_display_cols], hide_index=True)
 
     with tab_quran:
         st.write("Query: Different versions of the quran")
         quran_q = "Different versions of the quran"
-        quran_df = pd.read_csv("static\\quran.csv", encoding="utf-8-sig", index_col=0)
+        quran_df = pd.read_csv("static/quran.csv", encoding="utf-8-sig", index_col=0)
         st.dataframe(quran_df[tab_display_cols], hide_index=True)
 
     query_select = st.pills(
