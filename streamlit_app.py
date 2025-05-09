@@ -1,20 +1,19 @@
 import streamlit as st
 st.title("High Friction Graph Database Semantic Search")
 
-with st.spinner("Loading"):
+with st.spinner("Loading packages"):
     import os
     import pickle
     import platform
 
     import dotenv
-    from huggingface_hub import InferenceClient
     from neo4j import GraphDatabase
     import pandas as pd
     from tqdm import tqdm
 
     from graph_rag import app_text as text
     from graph_rag import app
-    from graph_rag.config import model_params
+    from graph_rag.config import model_params, HOLDING_QUERY
 
     tqdm.pandas()
 
@@ -76,17 +75,15 @@ st.dataframe(pd.read_csv("static\\model_params.csv", index_col=0, encoding="utf-
 
 st.markdown("## Search")
 
-holding_query = "What do you want to search for today?"
-
 if NEO4J_CONNECTION:
     q = st.text_input(
         "Search box",
-        value=holding_query,
+        value=HOLDING_QUERY,
         help="The query will be embedded and compared to the embedded subset of the BNB",
         label_visibility="hidden"
     )
 
-    if q != holding_query:
+    if q != HOLDING_QUERY:
 
         with driver.session() as session:
             limit = 5
@@ -119,98 +116,102 @@ if NEO4J_CONNECTION:
         pass
     except:
         st.write("Oops that search term failed, please try another.")
+
 elif not NEO4J_CONNECTION:
     st.write("The database connection is unavailable, but you can use these four example searches to compare results and for visualisations later")
     tab_shk_kw, tab_shk, tab_eic, tab_quran = st.tabs(["Shakespeare KW", "Shakespeare", "East India Company", "Quran"])
+
+    tab_display_cols = ["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]
+
     with tab_shk_kw:
         st.write("Query: Shakespeare")
-        st.write("This tab shows search with a single key word. The query returns results on a key word search using the term, unlike for the more nuanced searches in other tabs")
+        st.write("This query searches 'Shakespeare' as a single key word, compared to the natural language phrase in the next tab")
         shk_kw_q = "Shakespeare"
         shk_kw_df = pd.read_csv("static\\shakespeare_kw.csv", encoding="utf-8-sig", index_col=0)
-        st.table(shk_kw_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
+        st.dataframe(shk_kw_df[tab_display_cols], hide_index=True)
+
     with tab_shk:
         st.write("Query: What kind of works did William Shakespeare write?")
         shk_q = "What kind of works did William Shakespeare write?"
         shk_df = pd.read_csv("static\\shakespeare.csv", encoding="utf-8-sig", index_col=0)
-        st.table(shk_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
+        st.dataframe(shk_df[tab_display_cols], hide_index=True)
+
     with tab_eic:
         st.write("Query: How did the East India Company rise to power?")
         eic_q = "How did the East India Company rise to power?"
         eic_df = pd.read_csv("static\\east_india_company.csv", encoding="utf-8-sig", index_col=0)
-        st.table(eic_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
+        st.dataframe(eic_df[tab_display_cols], hide_index=True)
+
     with tab_quran:
         st.write("Query: Different versions of the quran")
         quran_q = "Different versions of the quran"
         quran_df = pd.read_csv("static\\quran.csv", encoding="utf-8-sig", index_col=0)
-        st.table(quran_df[["Keyword Search", "all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]])
+        st.dataframe(quran_df[tab_display_cols], hide_index=True)
+
+    query_select = st.pills(
+        label="Choose an offline query to work with:",
+        options=["Shakespeare KW", "Shakespeare", "East India Company", "Quran"],
+        default="Shakespeare KW"
+    )
+
+    result_df_map = {"Shakespeare KW": shk_kw_df, "Shakespeare": shk_df, "East India Company": eic_df, "Quran": quran_df}
+    query_map = {"Shakespeare KW": shk_kw_q, "Shakespeare": shk_q, "East India Company": eic_q, "Quran": quran_q}
+    results_df = result_df_map[query_select]
+    q = query_map[query_select]
+
 
 st.markdown("## Retrieval Augmented Generation")
 
 st.markdown(text.rag_text())
 
-vis_model = st.radio(
-    label="Choose the embedding model output you'd like to summarise with Mistral-7B.",
-    options=["all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]
-)
+with st.form(key="rag_form"):
+    vis_model = st.radio(
+        label="Choose the embedding model output you'd like to summarise with Mistral-7B.",
+        options=["all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]
+    )
 
-run_rag = st.button("Run RAG")
+    rag_button = st.empty()
+    rag_response = st.empty()
 
-if run_rag and q == holding_query:
-    st.write("Please run a search on the database, then retry.")
-
-elif run_rag and q != holding_query:
-    titles = "; ".join(results_df[vis_model].values)
-    client = InferenceClient(provider="hf-inference", api_key=os.environ["HF_API_KEY"])
-    n_requests = 1
-    with st.spinner(text="Get retrieval augmented generation content from HF API"):
-        responses = app.rag(client=client, titles=titles, n_requests=n_requests)
-
-    if responses:
-        tabs = st.tabs([f"Response {x}" for x in range(1, n_requests + 1)])
-        for r, tab in zip(responses, tabs):
-            tab.write(f"LLM generated response to semantic search results:")
-            tab.markdown(f">{r.choices[0].message['content']}")
+    run_rag = rag_button.form_submit_button(
+        label="Run RAG",
+        on_click=app.rag(query=q, titles=results_df[vis_model], n_requests=1, out_container=rag_response)
+    )
 
 st.markdown("## Ethics")
 st.markdown(text.ethics_text())
 
 st.markdown("## Visualising Results")
+vis_intro, how_to_read_text = text.visualise_text()
+st.write(vis_intro)
+
+with st.expander(label="How to read the visualisation"):
+    st.write(how_to_read_text)
 
 if not VISUALISE:
     st.write("Visualisations toggled off")
     st.stop()
 
-# Requires storage for the embedded files so that they can be umap-ed
-if LOCAL:
-    st.write(text.visualise_select())
-    vis_select = st.radio(
-        label="Do you want to use your search, or searches of the interim catalogue generated by BL users?",
-        horizontal=True,
-        options=["BL user searches", "My search"]
-    )
+st.write(text.visualise_select())
+vis_select = st.radio(
+    label="Do you want to visualise your query from the search box above (or the pre-made query if offline), or searches of the interim catalogue generated by BL users?",
+    options=["BL user searches", "My search (or offline search)"]
+)
 
-    if vis_select == "My search" and not NEO4J_CONNECTION:
-        result_select = st.radio(
-            label="When not connected to Neo4j only the four example searches are available. Choose one to visualise.",
-            options = ["Shakespeare KW", "Shakespeare", "East India Company", "Quran"]
-        )
-
-        result_df_map = {"Shakespeare KW": shk_kw_df, "Shakespeare": shk_df, "East India Company": eic_df, "Quran": quran_df}
-        query_map = {"Shakespeare KW": shk_kw_q, "Shakespeare": shk_q, "East India Company": eic_q, "Quran": quran_q}
-        results_df = result_df_map[result_select]
-        q = query_map[result_select]
-
-    vis_model = st.radio(
+if vis_select == "My search" and q != HOLDING_QUERY:
+    vis_model = st.pills(
         label="Choose the embedding model search results you'd like to visualise.",
         options=["all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]
     )
 
+# Requires storage for the embedded files so that they can be umap-ed
+if LOCAL:
     # subject headings for plotting
     with st.spinner("Running UMAP"):
         umap_df, reducer, dup_map = app.create_umap(vis_model)
     umap_fig = app.create_umap_fig(umap_df)
 
-    if vis_select == "My search" and q != holding_query:
+    if vis_select == "My search" and q != HOLDING_QUERY:
 
         with st.spinner("Adding your search to figure"):
             uris = pd.Index(results_df[vis_model + "_uri"].map(dup_map).values)
@@ -243,23 +244,6 @@ if LOCAL:
         st.plotly_chart(umap_fig)
 
 if not LOCAL:
-    st.write(text.visualise_select())
-    vis_select = st.radio(
-        label="Do you want to use one of the ready made searches above, or searches of the interim catalogue generated by BL users?",
-        options=["BL user searches", "My search"]
-    )
-
-    if vis_select == "My search" and q != holding_query:
-        vis_model = st.radio(
-            label="Choose the embedding model search results you'd like to visualise.",
-            options=["all-MiniLM-L6-v2", "all-mpnet-base-v2", "all-distilroberta-v1"]
-        )
-
-        vis_query = st.radio(
-            label="Choose the search",
-            options=["Shakespeare key word", "Shakespeare", "East India Company", "Quran"]
-        )
-
         st.write(text.remote_warning())
         umap_df = pickle.load(open(f"static/{model_params[vis_model]['acronym']}_umap.p", "rb"))
         umap_fig = app.create_umap_fig(umap_df)
