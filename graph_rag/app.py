@@ -1,6 +1,7 @@
 import os
 import pickle
 
+import huggingface_hub.errors
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 from matplotlib import colormaps
@@ -83,8 +84,10 @@ def rag(query: str, titles: pd.Series, out_container: st.empty, n_requests=1):
                 responses.append(rag_content)
 
             except requests.exceptions.ConnectionError as e:
-                print(f"Connection Error: {e}")
-                print("Please ensure you are connected to the internet!")
+                out_container.write(f"Connection Error: {e}. Please ensure you are connected to the internet!")
+
+            except huggingface_hub.errors.HfHubHTTPError as e:
+                out_container.write(f"HF Inference Hub error: {e}. \n\n There's been an error with the RAG component as described above, please contact harry [dot] lloyd [at] bl.uk to discuss.")
 
     if responses:
         tabs = out_container.tabs([f"Response {x}" for x in range(1, n_requests + 1)])
@@ -119,7 +122,7 @@ def load_umap_data(model: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame
     """
     most_common_lcsh_path = os.path.join(STATIC_DIR, "most_common_topic.csv")
     titles_path = os.path.join(STATIC_DIR, "titles.csv")
-    acronym = model_params[model]["acronym"]
+    acronym = MODEL_PARAMS[model]["acronym"]
     embedded_path = os.path.join(STATIC_DIR, f"titles_lcsh_embedded_{acronym}.p")
 
     most_common_lcsh_df = pd.read_csv(most_common_lcsh_path, index_col=0, encoding="utf-8-sig")
@@ -131,35 +134,8 @@ def load_umap_data(model: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame
     return most_common_lcsh_df, titles_df, embedded_df
 
 
-def apply_create_map(grp, dup_map: dict):
-    map_to = grp.index[0]
-    for uri in grp.index[1:]:
-        dup_map[uri] = map_to
-    return None
-
-
-def create_duplicate_map(df: pd.DataFrame) -> dict[str, str]:
-    """
-    UMAP is an expensive operation. We de-dup the dataframe of works on "Title" before UMAP-ing to minimise compute time
-    Searches on the database potentially return "Title" duplicates that were dropped.
-    So create a map from dropped duplicate URIs to equivalent URIs represented in the UMAP-ed so we can plot
-    duplicates later.
-    :param df:
-    :return:
-    """
-    duplicates_df = df[df.duplicated(subset="title", keep=False)]
-    duplicates_map = {}
-    duplicates_df.groupby(by="title", as_index=False).apply(apply_create_map, dup_map=duplicates_map,
-                                                            include_groups=False)
-    uris_retained_in_umap = df.drop_duplicates(subset="title", keep="first").index
-    for uri in uris_retained_in_umap:
-        duplicates_map[uri] = uri
-
-    return duplicates_map
-
-
 @st.cache_data(show_spinner=False)
-def create_umap(model: str) -> tuple[pd.DataFrame, umap.UMAP, dict[str: str]]:
+def create_umap(model: str) -> tuple[pd.DataFrame, umap.UMAP]:
     """
     Carry out the UMAP algorithm on a dataset of embedded BNB titles
     Return a plot ready dataframe and a fitted UMAP model
@@ -167,10 +143,9 @@ def create_umap(model: str) -> tuple[pd.DataFrame, umap.UMAP, dict[str: str]]:
     :return: tuple[pd.DataFrame, umap.UMAP]
     """
     most_common_lcsh_df, titles_df, embedded_df = load_umap_data(model)
-    acronym = model_params[model]["acronym"]
+    acronym = MODEL_PARAMS[model]["acronym"]
 
     combined_df = titles_df.join(embedded_df).dropna()
-    duplicates_map = create_duplicate_map(combined_df)
     drop_dup_df = combined_df.drop_duplicates(subset="title", keep="first").copy()
     topic_df = drop_dup_df.join(most_common_lcsh_df["lcsh_t1"], on="uri").dropna()
     umap_arr = np.vstack(topic_df[f"embedding_{acronym}"])
@@ -195,7 +170,7 @@ def create_umap(model: str) -> tuple[pd.DataFrame, umap.UMAP, dict[str: str]]:
 
     umap_df["LCSH Class"] = umap_df["LCSH Class Text"].map(class_map)
 
-    return umap_df, reducer, duplicates_map
+    return umap_df, reducer
 
 
 def umap_transform_user_search(model: str, reducer: umap.UMAP, use_live_data: bool = False):
@@ -209,7 +184,7 @@ def umap_transform_user_search(model: str, reducer: umap.UMAP, use_live_data: bo
     :return: pd.DataFrame
     """
 
-    acronym = model_params[model]["acronym"]
+    acronym = MODEL_PARAMS[model]["acronym"]
 
     if use_live_data:
         user_search_path = os.path.join(STATIC_DIR, "top_searches_to_date_2502.csv")
@@ -223,7 +198,7 @@ def umap_transform_user_search(model: str, reducer: umap.UMAP, use_live_data: bo
             index=pd.RangeIndex(5)
         )
     informational_df[f"embedding_{acronym}"] = informational_df["Search String"].progress_apply(
-        lambda x: model_params[model]["model"].encode(x)
+        lambda x: MODEL_PARAMS[model]["model"].encode(x)
     )
 
     informational_embed = reducer.transform(np.vstack(informational_df[f"embedding_{acronym}"].values))
