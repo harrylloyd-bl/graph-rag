@@ -28,7 +28,7 @@ model_aml62 = SentenceTransformer("all-MiniLM-L6-v2")
 model_amb2 = SentenceTransformer("all-mpnet-base-v2")
 model_adr1 = SentenceTransformer("all-distilroberta-v1")
 
-model_params = {
+MODEL_PARAMS = {
     "all-MiniLM-L6-v2": {"acronym": "aml62", "dims": 384, "max_seq_length": 256, "score": ["dot", "cos", "euc"],
                          "model": model_aml62},
     "all-mpnet-base-v2": {"acronym": "amb2", "dims": 768, "max_seq_len": 384, "score": ["dot", "cos", "euc"],
