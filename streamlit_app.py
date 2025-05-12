@@ -13,7 +13,7 @@ with st.spinner("Loading packages"):
 
     from graph_rag import app_text as text
     from graph_rag import app
-    from graph_rag.config import model_params, HOLDING_QUERY
+    from graph_rag.config import MODEL_PARAMS, HOLDING_QUERY
 
     tqdm.pandas()
 
@@ -97,9 +97,9 @@ if NEO4J_CONNECTION:
                 index=pd.RangeIndex(limit)
             )
 
-            for m in model_params.keys():
-                embedder = model_params[m]["model"]
-                idx = "titleLCSH" + model_params[m]["acronym"].capitalize()
+            for m in MODEL_PARAMS.keys():
+                embedder = MODEL_PARAMS[m]["model"]
+                idx = "titleLCSH" + MODEL_PARAMS[m]["acronym"].capitalize()
                 semantic_result = session.execute_read(app.semantic_search, query=q, model=embedder, idx=idx, nn=limit)
                 semantic_res = [(x[0][0], x[1]) for x in semantic_result]
                 results_df[m] = [x[0] for x in semantic_res]
@@ -169,10 +169,11 @@ with st.form(key="rag_form"):
     rag_button = st.empty()
     rag_response = st.empty()
 
-    run_rag = rag_button.form_submit_button(
-        label="Run RAG",
-        on_click=app.rag(query=q, titles=results_df[rag_model], n_requests=1, out_container=rag_response)
-    )
+    run_rag = rag_button.form_submit_button(label="Run RAG")
+
+if run_rag:
+    app.rag(query=q, titles=results_df[rag_model], n_requests=1, out_container=rag_response)
+
 
 st.markdown("## Ethics")
 st.markdown(text.ethics_text())
@@ -206,7 +207,8 @@ vis_model = st.pills(
 if LOCAL:
     # subject headings for plotting
     with st.spinner("Running UMAP"):
-        umap_df, reducer, dup_map = app.create_umap(vis_model)
+        umap_df, reducer = app.create_umap(vis_model)
+        dup_map = pickle.load(open("static/duplicate_map.p", "rb"))
     umap_fig = app.create_umap_fig(umap_df)
 
     if vis_select == "My search" and q != HOLDING_QUERY:
@@ -219,7 +221,7 @@ if LOCAL:
             umap_fig.add_scatter3d(x=x, y=y, z=z, hoverinfo="text", hovertext=hovertext_df, showlegend=False,
                                    mode="markers", marker={"size": 8, "symbol": "cross", "color": "black"})
 
-            embedded_search = model_params[vis_model]["model"].encode(q).reshape(1, model_params[vis_model]["dims"])
+            embedded_search = MODEL_PARAMS[vis_model]["model"].encode(q).reshape(1, MODEL_PARAMS[vis_model]["dims"])
 
             x, y, z = reducer.transform(embedded_search).T
             umap_fig.add_scatter3d(x=x, y=y, z=z, hoverinfo="text", hovertext=f"Search term: {q}", showlegend=False,
@@ -243,14 +245,19 @@ if LOCAL:
 
 if not LOCAL:
         st.write(text.remote_warning())
-        umap_df = pickle.load(open(f"static/{model_params[vis_model]['acronym']}_umap.p", "rb"))
+        umap_df = pickle.load(open(f"static/{MODEL_PARAMS[vis_model]['acronym']}_umap.p", "rb"))
         umap_fig = app.create_umap_fig(umap_df)
+
+        dup_map = pickle.load(open("static/duplicate_map.p", "rb"))
 
         uris = pd.Index(results_df[vis_model + "_uri"].map(dup_map).values)
         hovertext_df = umap_df.loc[uris, "Title"]
-        x, y, z = umap_df.loc[results_df[vis_model + "_uri"].values, ["Feature 1", "Feature 2", "Feature 3"]].values.T
-        umap_fig.add_scatter3d(x=x, y=y, z=z, hoverinfo="text", hovertext=hovertext_df, showlegend=False,
-                               mode="markers", marker={"size": 8, "symbol": "cross", "color": "black"})
+        try:
+            x, y, z = umap_df.loc[results_df[vis_model + "_uri"].values, ["Feature 1", "Feature 2", "Feature 3"]].values.T
+            umap_fig.add_scatter3d(x=x, y=y, z=z, hoverinfo="text", hovertext=hovertext_df, showlegend=False,
+                                   mode="markers", marker={"size": 8, "symbol": "cross", "color": "black"})
+        except KeyError:
+            st.write(f"Error in plotting query results, please choose an offline search query other than '{query_select}' to work with")
 
         with st.spinner("Creating UMAP scatter chart"):
             st.plotly_chart(umap_fig)
