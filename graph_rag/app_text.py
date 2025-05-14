@@ -1,7 +1,7 @@
 def title_text():
     text = """
         This app demonstrates some of the features involved in offering semantic search. Semantic search is search
-        that uses language models to embed the content of a collection into high-dimensional space, then embeds search
+        that uses language models to embed the (text/image/audio/layout) content of a collection into high-dimensional space, then embeds search
         queries into the same space to find results based not just on key word results, but the _meanings_ of the
         search term and collection content. This is a hot topic in search, we've had many enquiries from
         private companies offering this kind of capability, collaborations with academics to explore it and talks
@@ -9,7 +9,13 @@ def title_text():
         [Primo VE](https://knowledge.exlibrisgroup.com/Primo/Product_Documentation/020Primo_VE/Primo_VE_(English)/015_Getting_Started_with_Primo_Research_Assistant),
         the new front end for ALMA. This demo is my attempt to explain the concepts and important points to consider,
         so that when we talk about semantic search we can talk with authority, and specify clearly what we want from
-        any implementation.  
+        any implementation. 
+        
+        I've called it a 'High Friction' demo because I wanted to slow down people's progress through the it.
+        I'd like it to be an guide for people in the BL who might come across semantic search, with documentation for
+        (almost) every step to explain the workings of it and the pros/cons of different approaches. Plenty of people
+        have shown us a magic semantic search box already, so I thought offering a bit more engagement with the
+        workings would put us in a better place to act when external groups offer it to us, or we decide to do it internally.
         
         To create the demo I've used an old version of the British National Bibliography (BNB) linked dataset.
         I've embedded parts of the BNB using a trio of easily accessible Transformer models through the Sentence-Transformers
